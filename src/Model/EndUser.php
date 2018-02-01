@@ -1,6 +1,6 @@
 <?php
 /**
- * This file is part of the login-cidadao project or it's bundles.
+ * This file is part of the login-cidadao project or it's bundles and libs.
  *
  * (c) Guilherme Donato <guilhermednt on github>
  *

@@ -68,7 +68,7 @@ class EndUser implements EndUserInterface
     /**
      * @inheritDoc
      */
-    public function getPhone(): PhoneNumber
+    public function getPhone()
     {
         return $this->phone;
     }
@@ -86,7 +86,7 @@ class EndUser implements EndUserInterface
     /**
      * @inheritDoc
      */
-    public function getCpf(): string
+    public function getCpf()
     {
         return $this->cpf;
     }

@@ -34,7 +34,7 @@ interface EndUserInterface
     /**
      * @return PhoneNumber
      */
-    public function getPhone(): PhoneNumber;
+    public function getPhone();
 
     /**
      * @param string $cpf
@@ -45,7 +45,7 @@ interface EndUserInterface
     /**
      * @return string
      */
-    public function getCpf(): string;
+    public function getCpf();
 
     /**
      * @return string

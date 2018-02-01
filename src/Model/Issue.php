@@ -49,7 +49,10 @@ class Issue implements IssueInterface
      */
     public function __construct(IssueBuilder $builder)
     {
-        $data = $builder->getData();
+        $data = array_merge([
+            'id' => null,
+        ], $builder->getData());
+        
         $this->id = $data['id'];
         $this->title = $data['title'];
         $this->description = $data['description'];

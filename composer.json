@@ -1,7 +1,7 @@
 {
     "name": "procergs/usd-php",
     "description": "PHP lib to interact with our internal issue/helpdesk tool.",
-    "license": "AGPLv3",
+    "license": "AGPL-3.0-only",
     "require": {
         "php": "^7.0",
         "guzzlehttp/guzzle": "~6.0",

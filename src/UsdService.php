@@ -12,11 +12,14 @@ namespace PROCERGS\USD;
 
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
+use function GuzzleHttp\Psr7\uri_for;
+use GuzzleHttp\UriTemplate;
 use libphonenumber\NumberParseException;
 use libphonenumber\PhoneNumber;
 use libphonenumber\PhoneNumberFormat;
 use libphonenumber\PhoneNumberUtil;
 use PROCERGS\USD\Exception\IssueCreationException;
+use PROCERGS\USD\Exception\IssueNotFoundException;
 use PROCERGS\USD\Model\EndUser;
 use PROCERGS\USD\Model\Issue;
 use PROCERGS\USD\Model\IssueBuilder;
@@ -37,6 +40,9 @@ class UsdService
     /** @var string */
     private $newIssueEndpoint;
 
+    /** @var string */
+    private $getIssueEndpoint;
+
     /**
      * UsdService constructor.
      * @param ClientInterface $http
@@ -45,8 +51,10 @@ class UsdService
     public function __construct(ClientInterface $http, array $config)
     {
         $this->http = $http;
+        $this->checkConfig($config);
         $this->defaultPhoneCountry = $config['defaultPhoneCountry'];
         $this->newIssueEndpoint = $config['newIssueEndpoint'];
+        $this->getIssueEndpoint = $config['getIssueEndpoint'];
         $this->phoneUtil = PhoneNumberUtil::getInstance();
     }
 
@@ -68,6 +76,23 @@ class UsdService
             return $createdIssue;
         } catch (GuzzleException $e) {
             throw new IssueCreationException($e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    public function getIssue($id): IssueInterface
+    {
+        try {
+            $uri = (new UriTemplate())->expand($this->getIssueEndpoint, ['id' => $id]);
+            $response = $this->http->request('GET', $uri);
+            $issue = $this->getIssueFromResponse($response);
+
+            return $issue;
+        } catch (GuzzleException $e) {
+            if ($e->getCode() === 404) {
+                throw new IssueNotFoundException("Issue not found");
+            }
+
+            throw new \RuntimeException("Couldn't fetch the issue {$id}", $e->getCode(), $e);
         }
     }
 
@@ -127,5 +152,21 @@ class UsdService
             ->setEndUser($endUser);
 
         return new Issue($builder);
+    }
+
+    private function checkConfig(array $config)
+    {
+        foreach (['defaultPhoneCountry', 'newIssueEndpoint', 'getIssueEndpoint'] as $item) {
+            if (!isset($config[$item])) {
+                throw new \InvalidArgumentException("Missing '{$item}'");
+            }
+        }
+
+        uri_for($config['newIssueEndpoint']);
+        uri_for($config['getIssueEndpoint']);
+
+        if (false === strstr($config['getIssueEndpoint'], '{id}')) {
+            throw new \InvalidArgumentException("Missing {id} parameter in get issue endpoint URI.");
+        }
     }
 }

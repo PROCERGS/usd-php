@@ -21,6 +21,7 @@ use libphonenumber\PhoneNumber;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use PROCERGS\USD\Exception\IssueCreationException;
+use PROCERGS\USD\Exception\IssueNotFoundException;
 use PROCERGS\USD\Model\EndUserInterface;
 use PROCERGS\USD\Model\IssueInterface;
 
@@ -235,6 +236,139 @@ final class UsdServiceTest extends TestCase
         $usd->createIssue($issue);
     }
 
+    public function testInvalidConfigs()
+    {
+        $client = $this->getMockBuilder(ClientInterface::class)->getMock();
+
+        $count = 0;
+        try {
+            new UsdService($client, []);
+            $count++;
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(\InvalidArgumentException::class, $e);
+            $this->assertEquals("Missing 'defaultPhoneCountry'", $e->getMessage());
+        }
+        try {
+            new UsdService($client, [
+                'defaultPhoneCountry' => 'BR',
+            ]);
+            $count++;
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(\InvalidArgumentException::class, $e);
+            $this->assertEquals("Missing 'newIssueEndpoint'", $e->getMessage());
+        }
+        try {
+            new UsdService($client, [
+                'defaultPhoneCountry' => 'BR',
+                'newIssueEndpoint' => 'dummy',
+            ]);
+            $count++;
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(\InvalidArgumentException::class, $e);
+            $this->assertEquals("Missing 'getIssueEndpoint'", $e->getMessage());
+        }
+        try {
+            new UsdService($client, [
+                'defaultPhoneCountry' => 'BR',
+                'newIssueEndpoint' => 'dummy',
+                'getIssueEndpoint' => 'dummy',
+            ]);
+            $count++;
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(\InvalidArgumentException::class, $e);
+            $this->assertEquals("Missing {id} parameter in get issue endpoint URI.", $e->getMessage());
+        }
+        try {
+            new UsdService($client, [
+                'defaultPhoneCountry' => 'BR',
+                'newIssueEndpoint' => 0,
+                'getIssueEndpoint' => '{id}',
+            ]);
+            $count++;
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(\InvalidArgumentException::class, $e);
+            $this->assertEquals("URI must be a string or UriInterface", $e->getMessage());
+        }
+        try {
+            new UsdService($client, [
+                'defaultPhoneCountry' => 'BR',
+                'newIssueEndpoint' => 'dummy',
+                'getIssueEndpoint' => 0,
+            ]);
+            $count++;
+        } catch (\Exception $e) {
+            $this->assertInstanceOf(\InvalidArgumentException::class, $e);
+            $this->assertEquals("URI must be a string or UriInterface", $e->getMessage());
+        }
+
+        $this->assertEquals(0, $count);
+    }
+
+    public function testGetIssue()
+    {
+        $id = '123456';
+        $title = 'Some title';
+        $description = "A super complete description of the issue...\n\nWith multiple\nlines!";
+        $userName = "Full User's Name";
+        $userEmail = 'user@domain.tld';
+
+        $issueJson = json_encode([
+            'codIncidente' => $id,
+            'titulo' => $title,
+            'descricao' => $description,
+            'areaIncidente' => 'SOME AREA',
+            'siglaOrganizacao' => 'ORG',
+            'itemConfiguracao' => 'ITEM321',
+            'grupo' => 'GROUP DELTA',
+            'sintoma' => 'Unknown',
+            'usuarioFinalAfetado' => 'userCode',
+            'contatoUsuarioFinalAfetado' => $userName,
+            'telefoneUsuarioFinalAfetado' => 'error',
+            'emailUsuarioFinalAfetado' => $userEmail,
+        ]);
+
+        $requests = [];
+        $client = $this->getHttpClient($requests, [
+            new Response(200, ['Content-Type' => 'application/json'], $issueJson),
+        ]);
+        $usd = new UsdService($client, $this->getConfig());
+        $issue = $usd->getIssue($id);
+
+        $this->assertInstanceOf(IssueInterface::class, $issue);
+        $this->assertEquals($id, $issue->getId());
+        $this->assertEquals($title, $issue->getTitle());
+        $this->assertEquals($description, $issue->getDescription());
+    }
+
+    public function testGetNonExistentIssue()
+    {
+        $this->expectException(IssueNotFoundException::class);
+
+        $id = '123456';
+        $error = json_encode(["message" => "Número do incidente não encontrado"]);
+
+        $requests = [];
+        $client = $this->getHttpClient($requests, [
+            new Response(404, ['Content-Type' => 'application/json'], $error),
+        ]);
+        $usd = new UsdService($client, $this->getConfig());
+        $usd->getIssue($id);
+    }
+
+    public function testGetIssueException()
+    {
+        $this->expectException(\RuntimeException::class);
+
+        $id = '123456';
+
+        $requests = [];
+        $client = $this->getHttpClient($requests, [
+            new Response(500),
+        ]);
+        $usd = new UsdService($client, $this->getConfig());
+        $usd->getIssue($id);
+    }
+
     private function getHttpClient(array &$requests, array $responses)
     {
         $mock = new MockHandler($responses);
@@ -265,6 +399,7 @@ final class UsdServiceTest extends TestCase
         return [
             'defaultPhoneCountry' => 'BR',
             'newIssueEndpoint' => 'https://usd/issues',
+            'getIssueEndpoint' => 'https://usd/issues/{id}',
         ];
     }
 }
